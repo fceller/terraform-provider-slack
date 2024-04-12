@@ -1,27 +1,20 @@
-TEST := $(shell go list ./... |grep -v vendor)
+base_version := $(shell git describe --tags --dirty | sed -e 's/^v//g')
 
+build:
+	go build -ldflags="-X main.version=$(base_version) -X main.commit=n/a" .
 
-.PHONY: test
+install-%: build
+	mkdir -p ~/.terraform.d/plugins/github.com/jmatsu/slack/$(base_version)/${@:install-%=%}
+	mv terraform-provider-slack ~/.terraform.d/plugins/github.com/jmatsu/slack/$(base_version)/${@:install-%=%}/terraform-provider-slack_v$(base_version)
 
-.DEFAULT_GOAL := help
-help: ## List targets & descriptions
-	@cat Makefile* | grep -E '^[a-zA-Z_-]+:.*?## .*$$' | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+fmt:
+	gofmt -w .
 
-deps: ## Download dependencies
-	go mod download
+fmt-check:
+	gofmt .
 
-build: ## Build
-	go build .
+generate:
+	go generate
 
-tag: ## Create a tag
-	@test -n "$(TAG)"
-	git pull --tags
-	git tag v$(TAG)
-	git push --tags
-	$(MAKE) release
-
-release: ## Build the go binaries for various platform
-	./scripts/release.sh
-
-test: ## Run tests
-	TF_ACC=1 go test -v $(TEST)
+test:
+	TF_ACC=1 go test ./... -timeout 120m -v
